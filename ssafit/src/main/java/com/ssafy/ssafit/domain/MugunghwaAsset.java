@@ -3,7 +3,6 @@ package com.ssafy.ssafit.domain;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.persistence.CascadeType;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
@@ -11,42 +10,36 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
-import javax.persistence.OneToMany;
 import javax.validation.constraints.NotNull;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
 @Entity
 @Getter @Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @ToString
-public class Compensation {
+public class MugunghwaAsset {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private long cid;
+	private long id; // 기본키
 	
-//	private int level;
-	
-	private String title;
-	
-	private String detail;
-	
-	//lombok getter 시 getBasicX isBasic
-	private boolean basic;
-	
-	@JoinColumn(name="pid")
-	@ManyToOne(fetch = FetchType.LAZY)
+	@ManyToOne(fetch =FetchType.EAGER)
+	@JoinColumn(name = "level", referencedColumnName = "id")
 	@NotNull
-	@JsonIgnore
-	private MainUser pid;
+	private MugunghwaModel mugunghwaModel;
 	
+	private String name;
 	
-	@OneToMany(mappedBy = "cpsid", cascade = CascadeType.ALL)
-	@JsonIgnore
-	private List<GetCps> gets = new ArrayList<>(); 
-
+	private String imgLink;
 	
+	private String description;
+	
+	private int classNumber;
 }

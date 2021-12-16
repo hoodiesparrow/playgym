@@ -1,21 +1,19 @@
 package com.ssafy.ssafit.domain;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import javax.persistence.CascadeType;
-import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
 import javax.persistence.OneToMany;
-import javax.persistence.OrderBy;
 import javax.validation.constraints.NotNull;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -23,23 +21,25 @@ import lombok.ToString;
 
 @Entity
 @Getter @Setter
+@AllArgsConstructor
 @NoArgsConstructor
-@ToString(exclude = {"execSub"})
-public class Exercise {
-	
+@Builder
+@ToString
+public class FollowmeModel {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private long id;
-	
-	@Column(unique=true)
-	@NotNull
-	private String name;
+	private long id; // 기본키
 	
 	@NotNull
-	private int step;
+	private int level;
 	
-	@OneToMany(mappedBy = "exec",fetch = FetchType.EAGER, cascade= {CascadeType.REMOVE})
-	@JsonIgnoreProperties({"exec"})
-	@OrderBy("process ASC")
-	private List<ExerciseSub> execSub=new ArrayList<>();
+	@NotNull
+	private String modelLink;
+	
+	@NotNull
+	private String metaLink;
+	
+	@OneToMany
+	@JoinColumn(name = "level")
+	private List<FollowmeAsset> followmeAsset;
 }
