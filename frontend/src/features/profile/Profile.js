@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Route, Link, NavLink } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import styles from './Profile.module.css'
 import Grid from '@mui/material/Grid'
 import Tooltip from '@mui/material/Tooltip'
@@ -20,13 +20,18 @@ import bear from '../../images/characters/bear.png'
 import cat from '../../images/characters/cat.png'
 import chick from '../../images/characters/chick.png'
 import rabbit from '../../images/characters/rabbit.png'
+import {requestGetChildren} from '../../app/actions/userActions'
+import Logout from '../logout/Logout'
 
 function Player({player}){
   const selectPlayer=()=>{
-    console.log(player)
+    // console.log(player)
+    localStorage.setItem('sub-user', player.sid)
+    // console.log(localStorage.getItem('sub-user'))
+    window.location = '/home'
   }
   const onEditPlayerClick = (e) => {
-    console.log('ddd')
+    console.log('edit?')
     e.stopPropagation()
     // console.log(player)
   }
@@ -37,41 +42,31 @@ function Player({player}){
           <img src={player.image} width='100px'/>
         </div>
 
-        <EditButton onClick={onEditPlayerClick}><GavelIcon fontSize="small"/></EditButton>
-        {player.name}
+        {/* <EditButton onClick={onEditPlayerClick}><GavelIcon fontSize="small"/></EditButton> */}
+        {player.nickName}
       </Grid>
     </div>
   )
 }
 
 export function Profile(){
-  const players = [ // sub user(children) list
-    {
-      id: 0,
-      name: '첫째',
-      image: bear
-    },
-    {
-      id: 1,
-      name: '둘째',
-      image: chick
-    },
-    {
-      id: 2,
-      name: '막둥',
-      image: cat
-    },
-    {
-      id:3,
-      name: '주영',
-      image: rabbit
+  const players = useSelector(state=>state.user.subUser)
+  const dispatch = useDispatch()
+  // const [players, setPlayers] = useState([])
+  useEffect(()=>{
+    if(players.length === 0 || players === null || players === []){
+      dispatch(requestGetChildren(localStorage.getItem('main-user')))
+        .then(res => {
+          // console.log(res)
+          console.log(players)
+        })
     }
-  ]
+  },[])
 
-  // const onEditProfileClick = () => {
-  //   console.log('edit profile')
-  // }
-
+  useEffect(()=>{
+    // console.log(players) 
+  },[players])
+  
   // add profile click -> open dialog
   const [addOpen, setAddOpen] = useState(false);
   const onAddProfileClick = () => {
@@ -104,6 +99,7 @@ export function Profile(){
 
   return(
     <div className={styles.profile_container}>
+      <Logout />
       <BackAnimation 
         animate={{ 
           scale: 0, 
@@ -174,7 +170,7 @@ export function Profile(){
             alignItems="center"
             spacing={3}
           >
-            {players.map(item=>(<Player key={item.id} player={item}/>))}
+            {players.map(item=>(<Player key={item.sid} player={item}/>))}
 
             <Tooltip title="Add Player">
               <IconButton onClick={onAddProfileClick}>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Route, Link, NavLink } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { requestLoginUser } from '../../app/actions/userActions';
+import { useDispatch, useSelector } from 'react-redux';
+import { requestLoginUser, requestGetChildren } from '../../app/actions/userActions';
 import logo from '../../images/play_gym_logo.png';
 import cloudImage from '../../images/background_cloud.png'
 import Grid from '@mui/material/Grid';
@@ -15,6 +15,7 @@ import { motion } from "framer-motion"
 
 export function Login(props) {
   const dispatch = useDispatch()
+  const userState = useSelector(state=>state.user)
 
   const [id, setId] = useState('')
   const [idError, setIdError] = useState('')
@@ -104,27 +105,45 @@ export function Login(props) {
     dispatch(
       requestLoginUser(param)
     ).then(res=>{
-      if(res.payload.data.status==200){
-        // 1. save user info at store
-        console.log(res.payload.data.result)
+        // 1. check auth and save user info at state
+        // console.log(res.payload)
+        if(res.payload == 401){
+          // incorrect password
+          // console.log('401')          
+          setPwdAlertOpen(true)
+        }
+        else if(res.payload == 500){
+          // does not exist user id
+          setIdAlertOpen(true)
+        }
+        else{
+          // console.log(res.payload.data.result)
+          // console.log(userState)
 
-        // 2. save token into localStorage
-        localStorage.setItem('access-token', res.payload.data.result.token)
-        console.log(localStorage.getItem('access-token'))
+          // 2. save token, main-user key into localStorage
+          localStorage.setItem('access-token', res.payload.data.result.token)
+          localStorage.setItem('main-user', res.payload.data.result.id)
+          // console.log(localStorage.getItem('access-token'))
 
-        // 3. go to 'select player' page
-        props.history.push('/profile')
-      }
+          dispatch(requestGetChildren(localStorage.getItem('main-user')))
+            .then(()=>{
+              // 3. go to 'select player' page
+              props.history.push('/profile')
+
+            })
+        }
+      
     })
     .catch(err=>{
-      if(err.response.status==401){
-        // incorrect password
-        setPwdAlertOpen(true)
-      }
-      else{
-        // does not exist user id
-        setIdAlertOpen(true)
-      }
+      console.log(err)
+      // if(err.response.status==401){
+      //   // incorrect password
+      //   setPwdAlertOpen(true)
+      // }
+      // else{
+      //   // does not exist user id
+      //   setIdAlertOpen(true)
+      // }
     })
   }
 

@@ -4,6 +4,7 @@ export function setInterceptors(instance){
       const token = window.localStorage.getItem('access-token')
       if(token)
         config.headers.Authorization = `${token}`
+
       return config
     },
     function(err){
@@ -18,6 +19,19 @@ export function setInterceptors(instance){
     },
     function(err){
       return Promise.reject(err)
+    }
+  )
+  return instance
+}
+
+export function setInterceptors1(instance){
+  instance.interceptors.request.use(
+    function(config){
+      const token = window.localStorage.getItem('access-token')
+      if(token)
+        config.headers.Authorization = `${token}`
+
+      return config
     }
   )
   return instance
