@@ -98,6 +98,7 @@ h1, h5{
   height: 100%;
   align-items: center;
   text-align: center;
+  filter: drop-shadow(2px 2px 2px rgb(0 0 0 / 0.3));
 }
 
 .profile_btn{
@@ -106,7 +107,7 @@ h1, h5{
   position: fixed !important;
   top: 10px;
   left: 60px;
-  z-index: 100;
+  z-index: 2;
   width: 40px;
   height: 40px;
 }

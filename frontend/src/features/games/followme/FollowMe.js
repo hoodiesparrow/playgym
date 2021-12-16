@@ -7,7 +7,11 @@ import Grid from '@mui/material/Grid';
 import { Route, Link, NavLink } from 'react-router-dom';
 import GameStartCount from '../gameStartCount'
 import { useDispatch, useSelector } from 'react-redux';
-import { requestRandomGameByAge } from '../../../app/actions/userActions'
+import { 
+  requestRandomGameByAge, 
+  requestSubInfo,
+  requestGameSuccessSave,
+} from '../../../app/actions/userActions'
 import f_text from '../../../images/followMe/f_text.png'
 import baseMonkey from '../../../images/games/base_monkey.gif'
 import { request } from '../../../utils/axios'
@@ -19,15 +23,17 @@ import monkey1 from '../../../images/games/game_followMe_1.jpg'
 import monkey2 from '../../../images/games/game_followMe_2.jpg'
 import monkey3 from '../../../images/games/game_followMe_3.jpg'
 import useIsMount from '../../../utils/useIsMount'
-import EndDialog from './EndDialog'
+import EndDialog from '../EndDialog'
+import game_clear from '../../../sounds/game_clear.mp3'
+import game_fail from '../../../sounds/game_fail.mp3'
+import { BackFollow } from '../../background/BackFollow'
 // import debounce from 'lodash/debounce'
 
 const size = 800;
 const flip = true;
 
 export function FollowMe(props) {
-  const faceImg = new Image()
-  faceImg.src = "http://k5d205.p.ssafy.io:8080/api/img/cat.png";
+  const faceImg = useRef(new Image())
   
   const dispatch = useDispatch()
   const isMount = useIsMount()
@@ -44,16 +50,16 @@ export function FollowMe(props) {
   const idx = useRef(0)
   const isStarted = useRef(false)
   const isEngaged = useRef(false)
+  const isNextLoading = useRef(false)
   const successCount = useRef(0)
   const successFlag = useRef(0)
   const successThreshold = useRef(0)
   const isDrawing = useRef(false)
 
-  const canvasSize = useRef({w: 0, h: 0})
   const eyeSizeArr = useRef([-1, -1, -1, -1])
   const msAppeared = useRef(0)
-  const [isAppeared, setIsAppeared] = useState(false)
   const msFullbody = useRef(0)
+  const [isAppeared, setIsAppeared] = useState(false)
   const [isFullbody, setIsFullbody] = useState(false)
 
   const [endOpen, setEndOpen] = useState(false)
@@ -61,6 +67,7 @@ export function FollowMe(props) {
   const [progressData, setProgressData] = useState(0)
   const [seconds, setSeconds] = useState(0)
   const [openStartCount, setOpenStartCount] = useState(false)
+
 
   const startWebcam = async() => {
     try {
@@ -70,7 +77,6 @@ export function FollowMe(props) {
     } catch {
       throw new Error('camera issue')
     }
-    // webcamRef.current.update();
   }
 
   const requestGameData = async() => {
@@ -82,6 +88,14 @@ export function FollowMe(props) {
       })
       .catch(() => {throw new Error('server connection issue')})
 }
+
+  const requestProfileImage = async() => {
+    return dispatch(requestSubInfo(localStorage.getItem('sub-user')))
+      .then(res => {
+        faceImg.current.src = res.payload.data.image
+      })
+      .catch(() => {throw new Error('server connection issue')})
+  }
 
   // init()
   const init = () => {
@@ -96,7 +110,7 @@ export function FollowMe(props) {
     contextRef.current.scale(1, 1)
 
     // getWebcam, requestGameData
-    Promise.all([startWebcam(), requestGameData()])
+    Promise.all([startWebcam(), requestGameData(), requestProfileImage()])
       .then(async() => {
         const modelURL = exerciseList.current.modelLink
         const metaURL = exerciseList.current.metaLink
@@ -114,7 +128,6 @@ export function FollowMe(props) {
   }
 
   const loopIdentity = async(timestamp) => {
-
     webcamRef.current.update()
     const { pose, posenetOutput } = await modelRef.current.estimatePose(webcamRef.current.canvas)
 
@@ -147,50 +160,62 @@ export function FollowMe(props) {
       })
 
     drawPose(pose)
-    
+    if (idx.current === 4) {
     // if (idx.current === exerciseList.current.asset.length) {
-    if (idx.current === 1) {
       handleEnd()
       return
     }
 
     switch (isStarted.current) {
       case false:
-        if (!isEngaged.current) 
+        if (!isEngaged.current) {
+          isNextLoading.current = false
+          successFlag.current = false
           handleStart()
+        }
         break
       case true:
-        if (audioRef.current.paused) {
-          console.log(successCount.current)
-          
-          if (!isMount.current) return;
-          idx.current += 1
-          setProgressData(Number((idx.current / exerciseList.current.asset.length).toFixed(2)) * 100)
-          isStarted.current = false
-        }
         await predict(posenetOutput)
           .then(res => {
-            console.log(res)
+            // 무조건 넘어감
+            // successFlag.current = true
             if (res === true) {
+              if (successFlag.current) return;
+              
               successThreshold.current += 1
-              handleSuccess()
-            } else {
-              if (successThreshold.current > 0)
-                successThreshold.current -= 2
+              if (successThreshold.current > 40) {
+                successThreshold.current = 0
+                successCount.current += 1
+                successFlag.current = true
               }
+            } else {
+              if (successThreshold.current >= 1)
+                successThreshold.current -= 2;
+            }
           })
           .catch(err => console.log)
+
+        // 아이참재미있다 이후
+        if (audioRef.current.paused) {
+          if (isNextLoading.current) return;
+          isNextLoading.current = true
+          
+          if (!isMount.current) return;
+          successFlag.current ? stepHandler(true) : stepHandler(false)            
+          idx.current += 1
+          setProgressData(Number((idx.current / 4).toFixed(2)) * 100)
+          // setProgressData(Number((idx.current / exerciseList.current.asset.length).toFixed(2)) * 100)
+          isStarted.current = false
+        }
         break
       default:
     }
     isDrawing.current = false
   }
 
-
-
   const predict = async(posenetOutput) => {
     const prediction = await modelRef.current.predict(posenetOutput)
-    const exerciseIdx = exerciseList.current.asset[idx.current].aid
+    const exerciseIdx = exerciseList.current.asset[idx.current].classNumber - 1
     const current = prediction[exerciseIdx]
     if (current === undefined)
       throw new Error('undefined prediction')
@@ -242,13 +267,13 @@ export function FollowMe(props) {
       eyeSizeArr.current.push(eyeSize)
       eyeSizeArr.current.shift()
   
-      const minPartConfidence = 0.5
-      window.tmPose.drawKeypoints(pose.keypoints, minPartConfidence, contextRef.current);
-      window.tmPose.drawSkeleton(pose.keypoints, minPartConfidence, contextRef.current);
+      // const minPartConfidence = 0.5
+      // window.tmPose.drawKeypoints(pose.keypoints, minPartConfidence, contextRef.current);
+      // window.tmPose.drawSkeleton(pose.keypoints, minPartConfidence, contextRef.current);
   
       if (pose.keypoints[0].score > 0.8) {
         contextRef.current.drawImage(
-          faceImg,
+          faceImg.current,
           pose.keypoints[0].position.x - eyeSize * 2,
           pose.keypoints[0].position.y - eyeSize * 3,
           eyeSize * 5,
@@ -256,7 +281,7 @@ export function FollowMe(props) {
         ) 
       }
     } catch {
-      console.log(pose)
+      // console.log(pose)
       return
     }
   }
@@ -268,6 +293,7 @@ export function FollowMe(props) {
     isEngaged.current = true
     idx.current % 2 ? playBGM(interlude2) : playBGM(interlude1)
 
+    // 동물사진넣으려면여기수정
     await (async function() {
       for (let sec = 0; sec < 4; sec++) {
         for (let i = 0; i < 4; i++) {
@@ -280,24 +306,16 @@ export function FollowMe(props) {
       setImage(monkey1)
     })()
 
-    await delay(2600)
+    // if (!isMount.current) return;
+    // setImage(doggy)
+
+    await delay(2600)  // 4000 + 2600 = 6600
     if(!isMount.current)
       return
     setImage(`${exerciseList.current.asset[idx.current].image}`)
     playBGM(followMe)
     isStarted.current = true
     isEngaged.current = false
-  }
-
-  const handleSuccess = async() => {
-    if (successFlag.current)
-      return
-
-    successThreshold.current += 1
-    if (successThreshold.current > 20) {
-      successFlag.current = true
-      successCount.current += 1
-    }
   }
 
   const delay = (t) => new Promise(resolve => {
@@ -315,28 +333,12 @@ export function FollowMe(props) {
     }
   }, [])
 
-  // useEffect(() => {
-  //   console.log('second changed')
-  //   const interval = setInterval(() => {
-  //     if (seconds > 0) {
-  //       console.log('tick tock')
-  //       setSeconds(c => c - 1);
-  //       // setSeconds(seconds => seconds - 1); // same code
-  //     }
-  //     else {
-  //       console.log('times up!')
-  //       clearInterval(interval)
-  //       setOpenStartCount(false)
-  //     }
-  //   }, 1000)
-  //   // returned function => for clean up (leaving)
-  //   return () => clearInterval(interval)
-  // }, [seconds])
-
   const handleEnd = () => {
     cancelAnimationFrame(requestRef.current)
-    if (successCount.current > 4)
+    if (successCount.current >= 2) {
+      dispatch(requestGameSuccessSave())
       setGameRes(1)
+    }
     setEndOpen(true)    
     // webcamRef.current.stop()
   }
@@ -354,12 +356,29 @@ export function FollowMe(props) {
     successCount.current = 0
     successFlag.current = false
     successThreshold.current = 0
-    isDrawing.current = false
     setProgressData(0)
     setEndOpen(false)
+    isDrawing.current = false
     requestRef.current = requestAnimationFrame(loop)
   }
 
+  const stepHandler = async(res) => {
+    switch(res) {
+      case true:
+        canvasRef.current.style.border = '10px #A3C653 solid'
+        await delay(1000)
+        if (!isMount.current) return
+        canvasRef.current.style.border = ''
+        break
+      case false:
+        canvasRef.current.style.border = '10px #AC3943 solid'
+        await delay(1000)
+        if (!isMount.current) return
+        canvasRef.current.style.border = ''
+        break
+      default:
+    }
+  }
   // const handleResize = debounce(() => {
   //   console.dir(canvasRef.current)
   //   // canvasSize.current = {w: rightScreenRef.current}
@@ -368,6 +387,7 @@ export function FollowMe(props) {
   return(
     <div className={styles.container}>
       {/* {seconds} */}
+      <BackFollow />
 
       <Header progress={progressData} onEndgameClick={onClickGameEnd} />
       {/* <button onClick={() => {setSeconds(3); setOpenStartCount(true);}}>set 3sec timer</button> */}
@@ -386,6 +406,7 @@ export function FollowMe(props) {
         </Grid>
         <Grid item md={1} mt={'5%'}></Grid>
         <Grid item md={4} mt={'5%'}>
+          {/* <RightGameScreen style={successCue}> */}
           <RightGameScreen>
             <canvas ref={canvasRef} />
           </RightGameScreen>
@@ -394,6 +415,10 @@ export function FollowMe(props) {
       {/* send progress data as props to Header */}
       {/* <img src={baseMonkey} loop={'infinte'} width={'600px'}/> */}
       <GameStartCount open={openStartCount} text={seconds ? seconds : '시작!'} />
+      
+      <audio id='clear_sound' style={{display:'none'}} controls src={game_clear} > Your user agent does not support the HTML5 Audio element. </audio>
+      <audio id='fail_sound' style={{display:'none'}} controls src={game_fail} > Your user agent does not support the HTML5 Audio element. </audio>
+
       <EndDialog open={endOpen} gameRes={gameRes} getEndClose={onClickGameEnd} getReplay={onClickReplay}/>
     </div>
   )
